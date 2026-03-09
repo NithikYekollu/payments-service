@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require("uuid");
 const Joi = require("joi");
 const { validate } = require("../middleware/validate");
 const { logger } = require("../utils/logger");
+const { savePayment } = require("../utils/store");
 
 const router = express.Router();
 
@@ -26,6 +27,7 @@ router.post("/", validate(paymentSchema), async (req, res, next) => {
       stripe_payment_intent_id: `pi_simulated_${paymentId.slice(0, 8)}`,
       created_at: new Date().toISOString(),
     };
+    savePayment(payment);
     res.status(201).json(payment);
   } catch (err) { next(err); }
 });
