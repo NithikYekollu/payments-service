@@ -63,13 +63,21 @@ function idempotency() {
               await redisClient.set(redisKey, entry, { EX: IDEMPOTENCY_TTL_SECONDS });
               logger.info("Cached idempotent response", { idempotencyKey });
             }
-            // Release the lock after processing
-            await redisClient.del(lockKey);
           } catch (cacheErr) {
             logger.error("Failed to cache idempotent response", {
               idempotencyKey,
               error: cacheErr.message,
             });
+          } finally {
+            // Always release the lock, even if caching failed
+            try {
+              await redisClient.del(lockKey);
+            } catch (delErr) {
+              logger.error("Failed to release idempotency lock", {
+                idempotencyKey,
+                error: delErr.message,
+              });
+            }
           }
         })();
         return originalJson(body);
