@@ -53,22 +53,25 @@ function idempotency() {
 
       // Intercept res.json to capture the response for caching
       const originalJson = res.json.bind(res);
-      res.json = async (body) => {
-        try {
-          // Only cache successful responses so transient errors can be retried
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            const entry = JSON.stringify({ statusCode: res.statusCode, body });
-            await redisClient.set(redisKey, entry, { EX: IDEMPOTENCY_TTL_SECONDS });
-            logger.info("Cached idempotent response", { idempotencyKey });
+      res.json = (body) => {
+        // Fire-and-forget: cache asynchronously to avoid blocking the response
+        (async () => {
+          try {
+            // Only cache successful responses so transient errors can be retried
+            if (res.statusCode >= 200 && res.statusCode < 300) {
+              const entry = JSON.stringify({ statusCode: res.statusCode, body });
+              await redisClient.set(redisKey, entry, { EX: IDEMPOTENCY_TTL_SECONDS });
+              logger.info("Cached idempotent response", { idempotencyKey });
+            }
+            // Release the lock after processing
+            await redisClient.del(lockKey);
+          } catch (cacheErr) {
+            logger.error("Failed to cache idempotent response", {
+              idempotencyKey,
+              error: cacheErr.message,
+            });
           }
-          // Release the lock after processing
-          await redisClient.del(lockKey);
-        } catch (cacheErr) {
-          logger.error("Failed to cache idempotent response", {
-            idempotencyKey,
-            error: cacheErr.message,
-          });
-        }
+        })();
         return originalJson(body);
       };
 
