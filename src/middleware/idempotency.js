@@ -2,6 +2,7 @@ const { getRedisClient } = require("../utils/redis");
 const { logger } = require("../utils/logger");
 
 const IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60; // 24 hours
+const LOCK_TTL_SECONDS = 30; // Lock timeout for in-flight requests
 const KEY_PREFIX = "idempotency:";
 
 /**
@@ -9,8 +10,11 @@ const KEY_PREFIX = "idempotency:";
  *
  * When a request includes an `Idempotency-Key` header, the middleware checks
  * Redis for a cached response. If found, it returns the cached response
- * immediately. Otherwise, it intercepts the response, caches it in Redis
- * with a 24-hour TTL, and sends it to the client.
+ * immediately. Otherwise, it acquires a lock, intercepts the response, caches
+ * it in Redis with a 24-hour TTL, and sends it to the client.
+ *
+ * Keys are scoped per authenticated user to prevent cross-user collisions.
+ * Only successful (2xx) responses are cached to allow retries on failures.
  *
  * Requests without an `Idempotency-Key` header pass through unchanged.
  */
@@ -22,7 +26,10 @@ function idempotency() {
       return next();
     }
 
-    const redisKey = `${KEY_PREFIX}${idempotencyKey}`;
+    // Scope key to the authenticated user to prevent cross-user collisions
+    const userId = req.user?.sub || req.user?.id || "anonymous";
+    const redisKey = `${KEY_PREFIX}${userId}:${idempotencyKey}`;
+    const lockKey = `${redisKey}:lock`;
 
     try {
       const redisClient = await getRedisClient();
@@ -34,13 +41,28 @@ function idempotency() {
         return res.status(statusCode).json(body);
       }
 
+      // Acquire a lock to prevent concurrent duplicate processing
+      const lockAcquired = await redisClient.set(lockKey, "processing", {
+        NX: true,
+        EX: LOCK_TTL_SECONDS,
+      });
+
+      if (!lockAcquired) {
+        return res.status(409).json({ error: "A request with this idempotency key is already being processed" });
+      }
+
       // Intercept res.json to capture the response for caching
       const originalJson = res.json.bind(res);
       res.json = async (body) => {
         try {
-          const entry = JSON.stringify({ statusCode: res.statusCode, body });
-          await redisClient.set(redisKey, entry, { EX: IDEMPOTENCY_TTL_SECONDS });
-          logger.info("Cached idempotent response", { idempotencyKey });
+          // Only cache successful responses so transient errors can be retried
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            const entry = JSON.stringify({ statusCode: res.statusCode, body });
+            await redisClient.set(redisKey, entry, { EX: IDEMPOTENCY_TTL_SECONDS });
+            logger.info("Cached idempotent response", { idempotencyKey });
+          }
+          // Release the lock after processing
+          await redisClient.del(lockKey);
         } catch (cacheErr) {
           logger.error("Failed to cache idempotent response", {
             idempotencyKey,

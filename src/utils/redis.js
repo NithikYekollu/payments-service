@@ -4,20 +4,29 @@ const { logger } = require("./logger");
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 
 let client;
+let connectPromise;
 
 async function getRedisClient() {
   if (client && client.isOpen) {
     return client;
   }
 
-  client = createClient({ url: REDIS_URL });
+  if (connectPromise) {
+    return connectPromise;
+  }
 
-  client.on("error", (err) => {
-    logger.error("Redis client error", { error: err.message });
-  });
+  connectPromise = (async () => {
+    const newClient = createClient({ url: REDIS_URL });
+    newClient.on("error", (err) => {
+      logger.error("Redis client error", { error: err.message });
+    });
+    await newClient.connect();
+    client = newClient;
+    connectPromise = null;
+    return client;
+  })();
 
-  await client.connect();
-  return client;
+  return connectPromise;
 }
 
 module.exports = { getRedisClient };

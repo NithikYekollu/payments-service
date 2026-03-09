@@ -9,7 +9,14 @@ jest.mock("redis", () => {
     isOpen: true,
     connect: jest.fn().mockResolvedValue(undefined),
     get: jest.fn(async (key) => store.get(key) || null),
-    set: jest.fn(async (key, value) => { store.set(key, value); }),
+    set: jest.fn(async (key, value, options) => {
+      if (options && options.NX && store.has(key)) {
+        return null; // Key already exists, NX fails
+      }
+      store.set(key, value);
+      return "OK";
+    }),
+    del: jest.fn(async (key) => { store.delete(key); }),
     on: jest.fn(),
   };
   // Expose store for clearing between tests
