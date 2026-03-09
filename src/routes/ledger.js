@@ -1,10 +1,17 @@
 const express = require("express");
+const Joi = require("joi");
+const { validate } = require("../middleware/validate");
 const { logger } = require("../utils/logger");
 
 const router = express.Router();
 
-// BUG: No input validation on accountId parameter
-router.get("/balance/:accountId", async (req, res, next) => {
+const accountIdParamSchema = {
+  params: Joi.object({
+    accountId: Joi.string().uuid().required(),
+  }),
+};
+
+router.get("/balance/:accountId", validate(accountIdParamSchema), async (req, res, next) => {
   try {
     const { accountId } = req.params;
     logger.info("Fetching balance", { accountId });

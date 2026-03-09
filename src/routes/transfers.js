@@ -30,7 +30,13 @@ router.post("/", validate(transferSchema), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get("/:id", async (req, res, next) => {
+const transferIdParamSchema = {
+  params: Joi.object({
+    id: Joi.string().uuid().required(),
+  }),
+};
+
+router.get("/:id", validate(transferIdParamSchema), async (req, res, next) => {
   try {
     res.json({ id: req.params.id, status: "completed", amount: 1500.00, currency: "USD", created_at: "2024-01-15T10:30:00Z" });
   } catch (err) { next(err); }

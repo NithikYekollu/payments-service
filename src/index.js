@@ -35,8 +35,11 @@ app.use("/api/v1/ledger", authMiddleware, ledgerRoutes);
 // Global error handler
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  logger.info(`Payments service listening on port ${PORT}`);
-});
+/* istanbul ignore next */
+if (require.main === module) {
+  app.listen(PORT, () => {
+    logger.info(`Payments service listening on port ${PORT}`);
+  });
+}
 
 module.exports = app;
