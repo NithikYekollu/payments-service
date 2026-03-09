@@ -8,15 +8,13 @@ function errorHandler(err, req, res, next) {
     method: req.method,
   });
 
-  // Don't leak stack traces in production
-  const message =
-    process.env.NODE_ENV === "production"
-      ? "Internal server error"
-      : err.message;
+  // Only show detailed errors in development
+  const isDev = process.env.NODE_ENV === "development";
+  const message = isDev ? err.message : "Internal server error";
 
   res.status(err.statusCode || 500).json({
     error: message,
-    ...(process.env.NODE_ENV !== "production" && { stack: err.stack }),
+    ...(isDev && { stack: err.stack }),
   });
 }
 
