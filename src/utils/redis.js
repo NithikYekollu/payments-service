@@ -16,14 +16,17 @@ async function getRedisClient() {
   }
 
   connectPromise = (async () => {
-    const newClient = createClient({ url: REDIS_URL });
-    newClient.on("error", (err) => {
-      logger.error("Redis client error", { error: err.message });
-    });
-    await newClient.connect();
-    client = newClient;
-    connectPromise = null;
-    return client;
+    try {
+      const newClient = createClient({ url: REDIS_URL });
+      newClient.on("error", (err) => {
+        logger.error("Redis client error", { error: err.message });
+      });
+      await newClient.connect();
+      client = newClient;
+      return client;
+    } finally {
+      connectPromise = null;
+    }
   })();
 
   return connectPromise;
