@@ -1,6 +1,7 @@
 const { logger } = require("../utils/logger");
 
-// In-memory audit log store
+// In-memory audit log store (capped to prevent unbounded growth)
+const MAX_AUDIT_LOG_SIZE = 10000;
 const auditLog = [];
 
 /**
@@ -77,6 +78,9 @@ function auditMiddleware(req, res, next) {
     };
 
     auditLog.push(entry);
+    if (auditLog.length > MAX_AUDIT_LOG_SIZE) {
+      auditLog.shift();
+    }
 
     logger.info("Audit entry recorded", entry);
 
