@@ -9,6 +9,7 @@ const webhookRoutes = require("./routes/webhooks");
 const ledgerRoutes = require("./routes/ledger");
 const { errorHandler } = require("./middleware/errorHandler");
 const { authMiddleware } = require("./middleware/auth");
+const { apiRateLimiter } = require("./middleware/rateLimit");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,11 +27,11 @@ app.get("/health", (req, res) => {
 // Webhook routes (no auth — Stripe signs these)
 app.use("/api/v1/webhooks", webhookRoutes);
 
-// Authenticated routes
-app.use("/api/v1/transfers", authMiddleware, transferRoutes);
-app.use("/api/v1/payments", authMiddleware, paymentRoutes);
-app.use("/api/v1/refunds", authMiddleware, refundRoutes);
-app.use("/api/v1/ledger", authMiddleware, ledgerRoutes);
+// Authenticated routes (with rate limiting)
+app.use("/api/v1/transfers", authMiddleware, apiRateLimiter, transferRoutes);
+app.use("/api/v1/payments", authMiddleware, apiRateLimiter, paymentRoutes);
+app.use("/api/v1/refunds", authMiddleware, apiRateLimiter, refundRoutes);
+app.use("/api/v1/ledger", authMiddleware, apiRateLimiter, ledgerRoutes);
 
 // Global error handler
 app.use(errorHandler);
