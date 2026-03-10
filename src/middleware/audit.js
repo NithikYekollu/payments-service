@@ -9,8 +9,8 @@ const auditLog = [];
  * Examples: "payment.created", "refund.initiated", "transfer.created"
  */
 function deriveActionType(method, path) {
-  // Normalise: strip /api/v1/ prefix and any trailing slashes
-  const normalized = path.replace(/^\/api\/v1\//, "").replace(/\/$/, "");
+  // Normalise: strip /api/v1/ prefix, query strings, and trailing slashes
+  const normalized = path.replace(/^\/api\/v1\//, "").replace(/\?.*$/, "").replace(/\/$/, "");
   const segment = normalized.split("/")[0];
 
   const resourceMap = {

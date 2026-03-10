@@ -181,4 +181,9 @@ describe("deriveActionType", () => {
   it("should derive ledger.balance_retrieved for GET /api/v1/ledger/balance/:id", () => {
     expect(deriveActionType("GET", "/api/v1/ledger/balance/acc_123")).toBe("ledger.balance_retrieved");
   });
+
+  it("should strip query strings before deriving action type", () => {
+    expect(deriveActionType("GET", "/api/v1/payments?page=1")).toBe("payment.retrieved");
+    expect(deriveActionType("GET", "/api/v1/transfers?status=completed&page=2")).toBe("transfer.retrieved");
+  });
 });
