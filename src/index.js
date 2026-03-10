@@ -9,6 +9,8 @@ const webhookRoutes = require("./routes/webhooks");
 const ledgerRoutes = require("./routes/ledger");
 const { errorHandler } = require("./middleware/errorHandler");
 const { authMiddleware } = require("./middleware/auth");
+const { auditMiddleware } = require("./middleware/audit");
+const auditRoutes = require("./routes/audit");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -27,10 +29,13 @@ app.get("/health", (req, res) => {
 app.use("/api/v1/webhooks", webhookRoutes);
 
 // Authenticated routes
-app.use("/api/v1/transfers", authMiddleware, transferRoutes);
-app.use("/api/v1/payments", authMiddleware, paymentRoutes);
-app.use("/api/v1/refunds", authMiddleware, refundRoutes);
-app.use("/api/v1/ledger", authMiddleware, ledgerRoutes);
+app.use("/api/v1/transfers", authMiddleware, auditMiddleware, transferRoutes);
+app.use("/api/v1/payments", authMiddleware, auditMiddleware, paymentRoutes);
+app.use("/api/v1/refunds", authMiddleware, auditMiddleware, refundRoutes);
+app.use("/api/v1/ledger", authMiddleware, auditMiddleware, ledgerRoutes);
+
+// Audit log endpoint (authenticated, no audit on audit queries)
+app.use("/api/v1/audit", authMiddleware, auditRoutes);
 
 // Global error handler
 app.use(errorHandler);
