@@ -113,6 +113,23 @@ describe("POST /api/v1/refunds", () => {
     expect(second.statusCode).toBe(201);
   });
 
+  it("should handle floating-point decimal amounts correctly (0.1 + 0.2)", async () => {
+    const payment = await createPayment(0.3);
+    // First partial refund: $0.10
+    const first = await request(app)
+      .post("/api/v1/refunds")
+      .set(...authHeader())
+      .send({ payment_id: payment.id, amount: 0.1, reason: "requested_by_customer" });
+    expect(first.statusCode).toBe(201);
+
+    // Second partial refund: $0.20 (total = $0.30 which equals the payment)
+    const second = await request(app)
+      .post("/api/v1/refunds")
+      .set(...authHeader())
+      .send({ payment_id: payment.id, amount: 0.2, reason: "requested_by_customer" });
+    expect(second.statusCode).toBe(201);
+  });
+
   it("should reject refund for non-existent payment", async () => {
     const res = await request(app)
       .post("/api/v1/refunds")

@@ -26,12 +26,17 @@ router.post("/", validate(refundSchema), async (req, res, next) => {
     // Determine refund amount (default to full payment amount)
     const refundAmount = amount || payment.amount;
 
+    // Use integer cents to avoid floating-point precision errors
+    const toCents = (n) => Math.round(n * 100);
+    const paymentCents = toCents(payment.amount);
+    const refundCents = toCents(refundAmount);
+
     // Retrieve previous refunds for this payment
     const previousRefunds = getRefunds(payment_id);
-    const totalRefunded = previousRefunds.reduce((sum, r) => sum + r.amount, 0);
+    const totalRefundedCents = previousRefunds.reduce((sum, r) => sum + toCents(r.amount), 0);
 
     // Duplicate detection: reject if payment has already been fully refunded
-    if (totalRefunded >= payment.amount) {
+    if (totalRefundedCents >= paymentCents) {
       return res.status(409).json({
         error: "Payment has already been fully refunded",
         payment_id,
@@ -39,7 +44,7 @@ router.post("/", validate(refundSchema), async (req, res, next) => {
     }
 
     // Validate that the refund amount does not exceed the original payment
-    if (refundAmount > payment.amount) {
+    if (refundCents > paymentCents) {
       return res.status(400).json({
         error: `Refund amount ($${refundAmount}) exceeds original payment amount ($${payment.amount})`,
         payment_id,
@@ -47,8 +52,8 @@ router.post("/", validate(refundSchema), async (req, res, next) => {
     }
 
     // Validate that cumulative refunds do not exceed original payment
-    if (totalRefunded + refundAmount > payment.amount) {
-      const remaining = payment.amount - totalRefunded;
+    if (totalRefundedCents + refundCents > paymentCents) {
+      const remaining = (paymentCents - totalRefundedCents) / 100;
       return res.status(400).json({
         error: `Refund amount ($${refundAmount}) exceeds remaining refundable amount ($${remaining})`,
         payment_id,
